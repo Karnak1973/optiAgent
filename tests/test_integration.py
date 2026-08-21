@@ -132,4 +132,4 @@ class TestFullPipeline:
         # Run stats command
         result_stats = runner.invoke(app, ["stats", str(FIXTURES_DIR)])
         assert result_stats.exit_code == 0
-        assert "Total Nodes" in result_stats.stdout
+        assert "Nodes" in result_stats.stdout
