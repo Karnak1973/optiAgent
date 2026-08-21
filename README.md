@@ -171,9 +171,79 @@ synapse adaptive "refactor the auth module"
 
 ## MCP Server (for AI Agents)
 
-Synapse exposes an MCP server with 14 tools for AI agents like Claude Code, Cursor, or Aider.
+Synapse exposes an MCP server with 14 tools for AI agents like GitHub Copilot, Claude Code, Cursor, or Aider.
 
-### Setup
+### GitHub Copilot (VS Code)
+
+Synapse works natively with **GitHub Copilot Agent Mode** via MCP.
+
+**Step 1: Install Synapse**
+
+```bash
+git clone https://github.com/Karnak1973/optiAgent.git
+cd optiAgent
+python -m venv .venv
+# Windows
+.\.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+pip install -e ".[dev,mcp]"
+```
+
+**Step 2: Index your project**
+
+```bash
+synapse index .
+```
+
+**Step 3: Configure MCP in VS Code**
+
+The `.vscode/mcp.json` is already included in the repo. It looks like this:
+
+```json
+{
+  "servers": {
+    "synapse": {
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "args": ["-m", "synapse.server"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+```
+
+> **Note:** Adjust the `command` path for your OS:
+> - **Windows:** `${workspaceFolder}/.venv/Scripts/python.exe`
+> - **macOS/Linux:** `${workspaceFolder}/.venv/bin/python`
+
+**Step 4: Use in Copilot Chat (Agent Mode)**
+
+1. Open VS Code with your project
+2. Toggle **Agent Mode** in the Copilot Chat panel (click the icon next to the chat input)
+3. Copilot will auto-discover the Synapse MCP server
+4. Ask questions — Copilot will automatically use Synapse tools:
+
+```
+@copilot Show me the architecture of this project
+@copilot How does the login flow work?
+@copilot What functions call AuthService.login?
+@copilot What would break if I change auth/service.py?
+```
+
+**Available tools in Copilot:**
+
+| Tool | What Copilot uses it for |
+|:---|:---|
+| `synapse_search` | Finding relevant code snippets |
+| `synapse_map` | Understanding project architecture |
+| `synapse_outline` | Reading file structures |
+| `synapse_inspect` | Reading function implementations |
+| `synapse_callers` / `synapse_callees` | Tracing call chains |
+| `synapse_slice` | Debugging specific variables |
+| `synapse_impact` | Analyzing change impact |
+| `synapse_adaptive` | Auto-adjusting context depth |
+
+### Claude Desktop / Cursor / Other MCP Clients
 
 Add to your MCP client configuration:
 
@@ -182,14 +252,14 @@ Add to your MCP client configuration:
   "mcpServers": {
     "synapse": {
       "command": "python",
-      "args": ["-m", "synapse.server.mcp_server"],
+      "args": ["-m", "synapse.server"],
       "env": {}
     }
   }
 }
 ```
 
-### Available MCP Tools
+### All MCP Tools
 
 | Tool | Description |
 |:---|:---|
