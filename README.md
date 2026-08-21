@@ -125,6 +125,7 @@ synapse inspect AuthService.login . --level 3
 | Command | Description |
 |:---|:---|
 | `synapse stats` | Show statistics about the indexed repository |
+| `synapse viz` | Launch 3D graph visualization in your browser |
 
 ## Program Slicing
 
@@ -167,6 +168,38 @@ synapse adaptive "debug the crash in login" --symbol AuthService.login
 
 # "refactor" → L1-L3 cross-module impact
 synapse adaptive "refactor the auth module"
+```
+
+## 3D Graph Visualization
+
+Launch an interactive 3D visualization of your Code Property Graph directly in the browser.
+
+```bash
+synapse viz .
+```
+
+Opens `http://127.0.0.1:8765` with:
+
+- **3D graph** — nodes as spheres (files, classes, functions, methods) with force-directed layout
+- **Color-coded** by node type (blue=File, red=Class, green=Function, cyan=Method)
+- **Node size** reflects token consumption
+- **Hover** any node to see name, kind, tokens, and file
+- **Click** a node to see its signature and details
+- **Sidebar tabs**:
+  - **Overview** — graph stats, legend, selected node detail
+  - **Tokens** — bar chart comparing L0/L1/L2/L3 token consumption + per-symbol breakdown
+  - **Symbols** — full list of all symbols, click to zoom into any symbol
+
+**Controls:**
+- **Orbit** — click and drag to rotate
+- **Zoom** — scroll wheel
+- **Force Layout** — reset to force-directed arrangement
+- **Radial Layout** — arrange nodes by kind in concentric rings
+- **Toggle Labels** — show/hide node labels
+
+```bash
+synapse viz . --port 9000        # custom port
+synapse viz . --no-browser       # don't auto-open browser
 ```
 
 ## MCP Server (for AI Agents)
@@ -362,8 +395,13 @@ synapse/
 ├── server/         # MCP server
 │   └── mcp_server.py   # 14 MCP tools
 │
+├── viz/            # 3D visualization
+│   ├── server.py       # HTTP server + graph data API
+│   └── static/
+│       └── index.html  # Three.js 3D graph viewer
+│
 └── cli/            # CLI interface
-    └── main.py     # 12 Typer commands
+    └── main.py     # 13 Typer commands
 ```
 
 ## Supported Languages

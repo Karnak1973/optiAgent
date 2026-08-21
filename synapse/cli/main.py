@@ -390,6 +390,25 @@ def adaptive(
     console.print(f"\n[bold green]Total tokens: ~{total_tokens}[/bold green]")
 
 
+@app.command()
+def viz(
+    path: Path = typer.Argument(".", help="Repository path"),
+    port: int = typer.Option(8765, help="Server port"),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser automatically"),
+):
+    """Launch the 3D graph visualization in your browser.
+
+    Shows the Code Property Graph as an interactive 3D scene with
+    token consumption metrics, zoom level comparison, and symbol navigation.
+
+    Example: synapse viz .
+    """
+    from synapse.viz.server import start_server
+
+    cpg = get_cpg(path)
+    start_server(cpg, port=port, open_browser=not no_browser)
+
+
 if __name__ == "__main__":
     app()
 
