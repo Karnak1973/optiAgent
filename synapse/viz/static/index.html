@@ -3,164 +3,90 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Synapse 3D Graph Viewer</title>
+<title>Synapse 3D - Flow Simulation</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Consolas', 'Fira Code', monospace; overflow: hidden; }
-  #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-
-  /* Sidebar */
-  #sidebar {
-    position: absolute; top: 0; right: 0; width: 360px; height: 100%;
-    background: rgba(10, 10, 20, 0.92); border-left: 1px solid #1a1a2e;
-    display: flex; flex-direction: column; z-index: 10;
-    backdrop-filter: blur(10px);
-  }
-  #sidebar-header {
-    padding: 16px 20px; border-bottom: 1px solid #1a1a2e;
-    background: linear-gradient(135deg, #0d1117, #161b22);
-  }
-  #sidebar-header h1 { font-size: 18px; color: #58a6ff; margin-bottom: 4px; }
-  #sidebar-header p { font-size: 11px; color: #8b949e; }
-
-  /* Tabs */
-  .tabs { display: flex; border-bottom: 1px solid #1a1a2e; }
-  .tab {
-    flex: 1; padding: 10px; text-align: center; cursor: pointer;
-    font-size: 12px; color: #8b949e; border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-  }
-  .tab:hover { color: #e0e0e0; background: rgba(255,255,255,0.03); }
-  .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
-
-  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 16px 20px; }
-  .tab-content.active { display: block; }
-
-  /* Stats cards */
-  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-  .stat-card {
-    background: rgba(255,255,255,0.04); border: 1px solid #1a1a2e;
-    border-radius: 8px; padding: 12px;
-  }
-  .stat-card .label { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .stat-card .value.green { color: #6bcb77; }
-  .stat-card .value.blue { color: #58a6ff; }
-  .stat-card .value.yellow { color: #ffd93d; }
-  .stat-card .value.red { color: #ff6b6b; }
-
-  /* Token bar chart */
-  .bar-chart { margin: 8px 0; }
-  .bar-row { display: flex; align-items: center; margin-bottom: 6px; }
-  .bar-label { width: 50px; font-size: 11px; color: #8b949e; text-align: right; margin-right: 10px; }
-  .bar-container { flex: 1; height: 20px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; position: relative; }
-  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; display: flex; align-items: center; padding-left: 8px; font-size: 10px; color: white; font-weight: 600; }
-  .bar-fill.l0 { background: linear-gradient(90deg, #4a9eff, #2d7dd2); }
-  .bar-fill.l1 { background: linear-gradient(90deg, #6bcb77, #4caf50); }
-  .bar-fill.l2 { background: linear-gradient(90deg, #ffd93d, #f59e0b); }
-  .bar-fill.l3 { background: linear-gradient(90deg, #ff6b6b, #e74c3c); }
-
-  /* Node detail panel */
-  #node-detail {
-    display: none; background: rgba(255,255,255,0.04);
-    border: 1px solid #1a1a2e; border-radius: 8px;
-    padding: 14px; margin-bottom: 12px;
-  }
-  #node-detail.visible { display: block; }
-  #node-detail h3 { font-size: 14px; color: #58a6ff; margin-bottom: 8px; }
-  #node-detail .field { font-size: 11px; margin-bottom: 4px; }
-  #node-detail .field span { color: #8b949e; }
-  #node-detail pre {
-    background: rgba(0,0,0,0.3); border-radius: 4px; padding: 10px;
-    font-size: 11px; overflow-x: auto; white-space: pre-wrap;
-    border: 1px solid #1a1a2e; margin-top: 8px;
-    max-height: 200px; overflow-y: auto;
-  }
-
-  /* Symbol list */
-  .symbol-list { list-style: none; }
-  .symbol-item {
-    padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
-    cursor: pointer; transition: background 0.15s; border-radius: 4px;
-  }
-  .symbol-item:hover { background: rgba(88, 166, 255, 0.1); }
-  .symbol-item .name { font-size: 12px; color: #e0e0e0; }
-  .symbol-item .meta { font-size: 10px; color: #8b949e; margin-top: 2px; }
-  .symbol-item .tokens { font-size: 10px; color: #6bcb77; float: right; margin-top: -14px; }
-
-  /* Legend */
-  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #8b949e; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-
-  /* Controls */
-  .controls {
-    position: absolute; bottom: 20px; left: 20px; z-index: 10;
-    display: flex; gap: 8px;
-  }
-  .ctrl-btn {
-    background: rgba(10, 10, 20, 0.9); border: 1px solid #1a1a2e;
-    color: #e0e0e0; padding: 8px 14px; border-radius: 6px;
-    cursor: pointer; font-size: 12px; font-family: inherit;
-    transition: all 0.2s;
-  }
-  .ctrl-btn:hover { background: #1a1a2e; border-color: #58a6ff; color: #58a6ff; }
-  .ctrl-btn.active { background: #1a2332; border-color: #58a6ff; color: #58a6ff; }
-
-  /* Loading */
-  #loading {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: #0a0a0f; display: flex; align-items: center; justify-content: center;
-    z-index: 100; flex-direction: column; gap: 16px;
-  }
-  #loading .spinner {
-    width: 40px; height: 40px; border: 3px solid #1a1a2e;
-    border-top-color: #58a6ff; border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #loading p { color: #8b949e; font-size: 13px; }
-
-  /* Tooltip */
-  #tooltip {
-    position: fixed; display: none; background: rgba(10,10,20,0.95);
-    border: 1px solid #58a6ff; border-radius: 6px; padding: 10px 14px;
-    pointer-events: none; z-index: 20; max-width: 300px;
-    backdrop-filter: blur(8px);
-  }
-  #tooltip .t-name { font-size: 13px; color: #58a6ff; font-weight: 600; }
-  #tooltip .t-kind { font-size: 10px; color: #8b949e; text-transform: uppercase; }
-  #tooltip .t-tokens { font-size: 11px; color: #6bcb77; margin-top: 4px; }
-  #tooltip .t-file { font-size: 10px; color: #8b949e; margin-top: 2px; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #1a1a2e; border-radius: 3px; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060610;color:#e0e0e0;font-family:'Consolas','Fira Code',monospace;overflow:hidden}
+#c{position:absolute;top:0;left:0;width:100%;height:100%}
+#sidebar{position:absolute;top:0;right:0;width:370px;height:100%;background:rgba(6,6,16,.94);border-left:1px solid #151530;display:flex;flex-direction:column;z-index:10;backdrop-filter:blur(12px)}
+#sidebar-header{padding:14px 18px;border-bottom:1px solid #151530;background:linear-gradient(135deg,#0a0f1a,#101828)}
+#sidebar-header h1{font-size:16px;color:#58a6ff;margin-bottom:2px}
+#sidebar-header p{font-size:10px;color:#6e7681}
+.tabs{display:flex;border-bottom:1px solid #151530}
+.tab{flex:1;padding:9px;text-align:center;cursor:pointer;font-size:11px;color:#6e7681;border-bottom:2px solid transparent;transition:.2s}
+.tab:hover{color:#e0e0e0;background:rgba(255,255,255,.02)}
+.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.tab-content{display:none;flex:1;overflow-y:auto;padding:14px 16px}
+.tab-content.active{display:block}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-card{background:rgba(255,255,255,.03);border:1px solid #151530;border-radius:6px;padding:10px}
+.stat-card .label{font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:.4px}
+.stat-card .value{font-size:20px;font-weight:700;margin-top:3px}
+.g{color:#6bcb77}.b{color:#58a6ff}.y{color:#ffd93d}.r{color:#ff6b6b}
+.bar-chart{margin:6px 0}
+.bar-row{display:flex;align-items:center;margin-bottom:5px}
+.bar-label{width:40px;font-size:10px;color:#6e7681;text-align:right;margin-right:8px}
+.bar-container{flex:1;height:18px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s;display:flex;align-items:center;padding-left:6px;font-size:9px;color:#fff;font-weight:600}
+.bar-fill.l0{background:linear-gradient(90deg,#4a9eff,#2d7dd2)}
+.bar-fill.l1{background:linear-gradient(90deg,#6bcb77,#4caf50)}
+.bar-fill.l2{background:linear-gradient(90deg,#ffd93d,#f59e0b)}
+.bar-fill.l3{background:linear-gradient(90deg,#ff6b6b,#e74c3c)}
+#flow-panel{background:rgba(88,166,255,.06);border:1px solid #1a2a44;border-radius:8px;padding:14px;margin-bottom:12px}
+#flow-panel h3{font-size:13px;color:#58a6ff;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.flow-step{display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;border-radius:4px;background:rgba(255,255,255,.02);border-left:3px solid #333;transition:all .3s}
+.flow-step.active{background:rgba(88,166,255,.12);border-left-color:#58a6ff;box-shadow:0 0 12px rgba(88,166,255,.15)}
+.flow-step.done{border-left-color:#6bcb77;opacity:.6}
+.flow-step .step-num{font-size:10px;color:#6e7681;width:20px;text-align:center}
+.flow-step .step-name{font-size:11px;color:#e0e0e0;flex:1}
+.flow-step .step-tokens{font-size:10px;color:#6bcb77}
+#token-anim{background:rgba(107,203,119,.06);border:1px solid #1a3322;border-radius:8px;padding:14px;margin-bottom:12px}
+.token-ring{width:100%;height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin:6px 0}
+.token-ring-fill{height:100%;border-radius:4px;transition:width .3s;background:linear-gradient(90deg,#6bcb77,#ffd93d,#ff6b6b)}
+.token-label{display:flex;justify-content:space-between;font-size:10px;color:#6e7681}
+#node-detail{display:none;background:rgba(255,255,255,.03);border:1px solid #151530;border-radius:6px;padding:12px;margin-bottom:10px}
+#node-detail.visible{display:block}
+#node-detail h3{font-size:13px;color:#58a6ff;margin-bottom:6px}
+#node-detail .field{font-size:10px;margin-bottom:3px;color:#8b949e}
+#node-detail pre{background:rgba(0,0,0,.3);border-radius:4px;padding:8px;font-size:10px;overflow-x:auto;white-space:pre-wrap;border:1px solid #151530;margin-top:6px;max-height:150px;overflow-y:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#6e7681}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+.symbol-list{list-style:none}
+.symbol-item{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.15s;border-radius:3px}
+.symbol-item:hover{background:rgba(88,166,255,.08)}
+.symbol-item .name{font-size:11px;color:#e0e0e0}
+.symbol-item .meta{font-size:9px;color:#6e7681;margin-top:1px}
+.symbol-item .tokens{font-size:9px;color:#6bcb77;float:right;margin-top:-12px}
+.controls{position:absolute;bottom:16px;left:16px;z-index:10;display:flex;gap:6px;flex-wrap:wrap}
+.ctrl-btn{background:rgba(6,6,16,.92);border:1px solid #151530;color:#8b949e;padding:7px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-family:inherit;transition:.2s}
+.ctrl-btn:hover{background:#151530;border-color:#58a6ff;color:#58a6ff}
+.ctrl-btn.active{background:#101828;border-color:#58a6ff;color:#58a6ff}
+.ctrl-btn.playing{background:#1a2a1a;border-color:#6bcb77;color:#6bcb77;animation:pulse-g 1s infinite}
+@keyframes pulse-g{0%,100%{box-shadow:0 0 4px #6bcb77}50%{box-shadow:0 0 12px #6bcb77}}
+#loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#060610;display:flex;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:14px}
+#loading .spinner{width:36px;height:36px;border:3px solid #151530;border-top-color:#58a6ff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{color:#6e7681;font-size:12px}
+#tooltip{position:fixed;display:none;background:rgba(6,6,16,.96);border:1px solid #58a6ff;border-radius:5px;padding:8px 12px;pointer-events:none;z-index:20;max-width:280px;backdrop-filter:blur(8px)}
+#tooltip .tn{font-size:12px;color:#58a6ff;font-weight:600}
+#tooltip .tk{font-size:9px;color:#6e7681;text-transform:uppercase}
+#tooltip .tt{font-size:10px;color:#6bcb77;margin-top:3px}
+#tooltip .tf{font-size:9px;color:#6e7681;margin-top:1px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#151530;border-radius:3px}
 </style>
 </head>
 <body>
-
-<div id="loading">
-  <div class="spinner"></div>
-  <p>Loading Code Property Graph...</p>
-</div>
-
-<div id="canvas-container"></div>
-
+<div id="loading"><div class="spinner"></div><p>Loading Code Property Graph...</p></div>
+<div id="c"></div>
 <div id="sidebar">
-  <div id="sidebar-header">
-    <h1>Synapse 3D Graph</h1>
-    <p>Code Property Graph Viewer + Token Metrics</p>
-  </div>
-
+  <div id="sidebar-header"><h1>Synapse 3D - Flow</h1><p>Interactive Code Flow Simulation</p></div>
   <div class="tabs">
-    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab active" data-tab="overview">Graph</div>
+    <div class="tab" data-tab="flow">Flow</div>
     <div class="tab" data-tab="tokens">Tokens</div>
     <div class="tab" data-tab="symbols">Symbols</div>
   </div>
-
-  <!-- Overview Tab -->
   <div class="tab-content active" id="tab-overview">
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:#4a9eff"></div>File</div>
@@ -169,551 +95,460 @@
       <div class="legend-item"><div class="legend-dot" style="background:#6bcb77"></div>Function</div>
       <div class="legend-item"><div class="legend-dot" style="background:#4ecdc4"></div>Method</div>
     </div>
-
     <div class="stat-grid" id="stats-grid"></div>
-
     <div id="node-detail">
       <h3 id="detail-name"></h3>
-      <div class="field"><span>Kind:</span> <span id="detail-kind"></span></div>
-      <div class="field"><span>File:</span> <span id="detail-file"></span></div>
-      <div class="field"><span>Line:</span> <span id="detail-line"></span></div>
-      <div class="field"><span>Tokens:</span> <span id="detail-tokens"></span></div>
+      <div class="field" id="detail-kind"></div>
+      <div class="field" id="detail-file"></div>
+      <div class="field" id="detail-tokens"></div>
       <pre id="detail-code"></pre>
     </div>
   </div>
-
-  <!-- Tokens Tab -->
-  <div class="tab-content" id="tab-tokens">
-    <h3 style="font-size:13px;color:#58a6ff;margin-bottom:12px">Token Consumption by Zoom Level</h3>
-    <div class="bar-chart" id="token-bars"></div>
-    <div id="token-details"></div>
+  <div class="tab-content" id="tab-flow">
+    <div id="flow-panel">
+      <h3>&#9654; <span id="flow-title">Click a node to trace flow</span></h3>
+      <div id="flow-steps"></div>
+      <div style="margin-top:10px;display:flex;gap:6px">
+        <button class="ctrl-btn" id="btn-flow-play">Play</button>
+        <button class="ctrl-btn" id="btn-flow-step">Step</button>
+        <button class="ctrl-btn" id="btn-flow-reset">Reset</button>
+      </div>
+    </div>
+    <div id="token-anim">
+      <div class="token-label"><span>Tokens consumed</span><span id="token-counter">0</span></div>
+      <div class="token-ring"><div class="token-ring-fill" id="token-bar" style="width:0%"></div></div>
+      <div class="token-label"><span>L0: <span id="tok-l0">0</span></span><span>L1: <span id="tok-l1">0</span></span><span>L2: <span id="tok-l2">0</span></span><span>L3: <span id="tok-l3">0</span></span></div>
+    </div>
   </div>
-
-  <!-- Symbols Tab -->
+  <div class="tab-content" id="tab-tokens">
+    <h3 style="font-size:12px;color:#58a6ff;margin-bottom:10px">Token Consumption by Zoom Level</h3>
+    <div class="bar-chart" id="token-bars"></div>
+  </div>
   <div class="tab-content" id="tab-symbols">
-    <h3 style="font-size:13px;color:#58a6ff;margin-bottom:12px">All Symbols</h3>
+    <h3 style="font-size:12px;color:#58a6ff;margin-bottom:10px">All Symbols</h3>
     <ul class="symbol-list" id="symbol-list"></ul>
   </div>
 </div>
-
 <div class="controls">
-  <button class="ctrl-btn active" id="btn-force">Force Layout</button>
-  <button class="ctrl-btn" id="btn-radial">Radial Layout</button>
-  <button class="ctrl-btn" id="btn-reset">Reset Camera</button>
-  <button class="ctrl-btn" id="btn-labels">Toggle Labels</button>
+  <button class="ctrl-btn active" id="btn-force">Force</button>
+  <button class="ctrl-btn" id="btn-radial">Radial</button>
+  <button class="ctrl-btn" id="btn-reset">Reset</button>
+  <button class="ctrl-btn active" id="btn-labels">Labels</button>
+  <button class="ctrl-btn active" id="btn-particles">Particles</button>
 </div>
-
-<div id="tooltip">
-  <div class="t-name" id="tt-name"></div>
-  <div class="t-kind" id="tt-kind"></div>
-  <div class="t-tokens" id="tt-tokens"></div>
-  <div class="t-file" id="tt-file"></div>
-</div>
-
+<div id="tooltip"><div class="tn" id="tt-name"></div><div class="tk" id="tt-kind"></div><div class="tt" id="tt-tokens"></div><div class="tf" id="tt-file"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-(function() {
-  // ========== STATE ==========
-  let graphData = null;
-  let tokenMetrics = null;
-  let nodes = [], edges = [];
-  let meshGroup, labelGroup;
-  let showLabels = true;
-  let selectedNode = null;
-  let hoveredNode = null;
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
-  const nodeMeshMap = new Map();
-  const nodeById = new Map();
+(function(){
+var nodes=[],edges=[],positions={};
+var meshGroup,labelGroup,particleGroup,flowGroup;
+var showLabels=true,particlesOn=true;
+var selectedNode=null,flowData=null,flowStep=-1,flowTimer=null;
+var nodeMeshMap={},nodeById={};
+var raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+var ct=document.getElementById('c');
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060610);
+scene.fog=new THREE.FogExp2(0x060610,.002);
+var camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,2000);
+camera.position.set(0,80,160);
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+ct.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0x404060,.5));
+var dl=new THREE.DirectionalLight(0xffffff,.7);
+dl.position.set(50,100,50);scene.add(dl);
+var edgesGroup=new THREE.Group();scene.add(edgesGroup);
+meshGroup=new THREE.Group();scene.add(meshGroup);
+labelGroup=new THREE.Group();scene.add(labelGroup);
+particleGroup=new THREE.Group();scene.add(particleGroup);
+flowGroup=new THREE.Group();scene.add(flowGroup);
+var camAngle={x:0,y:0},camDist=180,camTarget=new THREE.Vector3();
+var isOrbiting=false,prevMouse={x:0,y:0};
 
-  // ========== THREE.JS SETUP ==========
-  const container = document.getElementById('canvas-container');
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0f);
-  scene.fog = new THREE.FogExp2(0x0a0a0f, 0.003);
+var edgeColors={CONTAINS:'#1a1a3a',DECLARES:'#1a2a3a',CALLS:'#58a6ff',IMPORTS:'#333',INHERITS:'#ff6b6b',REFERENCES:'#444'};
+var kindColors={FILE:0x4a9eff,CLASS:0xff6b6b,INTERFACE:0xffd93d,FUNCTION:0x6bcb77,METHOD:0x4ecdc4};
+var kindSizes={FILE:3,CLASS:2.5,INTERFACE:2,FUNCTION:1.5,METHOD:1.2};
 
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.set(0, 80, 150);
+function updateCamera(){
+  camera.position.x=camTarget.x+Math.sin(camAngle.x)*Math.cos(camAngle.y)*camDist;
+  camera.position.y=camTarget.y+Math.sin(camAngle.y)*camDist;
+  camera.position.z=camTarget.z+Math.cos(camAngle.x)*Math.cos(camAngle.y)*camDist;
+  camera.lookAt(camTarget);
+}
+updateCamera();
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  container.appendChild(renderer.domElement);
+function createTextSprite(text,color){
+  var canvas=document.createElement('canvas');
+  var ctx=canvas.getContext('2d');
+  canvas.width=512;canvas.height=64;
+  ctx.font='bold 28px Consolas,monospace';
+  ctx.fillStyle=color||'#e0e0e0';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,256,32);
+  var tex=new THREE.CanvasTexture(canvas);
+  var mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+  var sprite=new THREE.Sprite(mat);
+  sprite.scale.set(16,2,1);
+  return sprite;
+}
 
-  // Lights
-  scene.add(new THREE.AmbientLight(0x404060, 0.6));
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(50, 100, 50);
-  scene.add(dirLight);
-  const pointLight = new THREE.PointLight(0x58a6ff, 0.5, 300);
-  pointLight.position.set(0, 50, 0);
-  scene.add(pointLight);
-
-  // Grid
-  const gridHelper = new THREE.GridHelper(400, 40, 0x111122, 0x111122);
-  scene.add(gridHelper);
-
-  // Groups
-  meshGroup = new THREE.Group();
-  labelGroup = new THREE.Group();
-  scene.add(meshGroup);
-  scene.add(labelGroup);
-
-  // ========== ORBIT CONTROLS (manual) ==========
-  let isDragging = false, prevMouse = {x:0, y:0};
-  let spherical = {radius: 180, theta: 0, phi: Math.PI / 4};
-  let target = new THREE.Vector3(0, 0, 0);
-
-  function updateCamera() {
-    camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
-    camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
-    camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
-    camera.lookAt(target);
-  }
-  updateCamera();
-
-  renderer.domElement.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { isDragging = true; prevMouse = {x: e.clientX, y: e.clientY}; }
-  });
-  renderer.domElement.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-      const dx = e.clientX - prevMouse.x;
-      const dy = e.clientY - prevMouse.y;
-      spherical.theta -= dx * 0.005;
-      spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005));
-      prevMouse = {x: e.clientX, y: e.clientY};
-      updateCamera();
-    }
-    // Hover detection
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    checkHover(e);
-  });
-  renderer.domElement.addEventListener('mouseup', () => isDragging = false);
-  renderer.domElement.addEventListener('mouseleave', () => isDragging = false);
-  renderer.domElement.addEventListener('wheel', (e) => {
-    spherical.radius = Math.max(20, Math.min(500, spherical.radius + e.deltaY * 0.3));
-    updateCamera();
-  });
-  renderer.domElement.addEventListener('click', (e) => checkClick(e));
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  // ========== FORCE-DIRECTED LAYOUT ==========
-  function forceLayout(nodes, edges, iterations = 80) {
-    const pos = {};
-    const vel = {};
-    nodes.forEach((n, i) => {
-      const angle = (i / nodes.length) * Math.PI * 2;
-      const r = 30 + Math.random() * 40;
-      pos[n.id] = {x: Math.cos(angle) * r, y: (Math.random() - 0.5) * 40, z: Math.sin(angle) * r};
-      vel[n.id] = {x: 0, y: 0, z: 0};
+function applyLayout(type){
+  var cx=0,cz=0;
+  if(type==='radial'){
+    var byKind={};
+    nodes.forEach(function(n){if(!byKind[n.kind])byKind[n.kind]=[];byKind[n.kind].push(n)});
+    var kinds=Object.keys(byKind);
+    var radiusStep=40;
+    kinds.forEach(function(kind,ki){
+      var r=(ki+1)*radiusStep;
+      var items=byKind[kind];
+      items.forEach(function(n,i){
+        var a=(i/items.length)*Math.PI*2;
+        positions[n.id]={x:cx+Math.cos(a)*r,y:(Math.random()-.5)*30,z:cz+Math.sin(a)*r};
+      });
     });
-
-    const nodeMap = {};
-    nodes.forEach(n => nodeMap[n.id] = n);
-
-    for (let iter = 0; iter < iterations; iter++) {
-      const temp = 1.0 - iter / iterations;
-      // Repulsion (all pairs)
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = pos[nodes[i].id], b = pos[nodes[j].id];
-          let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-          let dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 0.1;
-          let force = 200 / (dist * dist);
-          force = Math.min(force, 5);
-          const fx = (dx / dist) * force * temp;
-          const fy = (dy / dist) * force * temp;
-          const fz = (dz / dist) * force * temp;
-          vel[nodes[i].id].x += fx; vel[nodes[i].id].y += fy; vel[nodes[i].id].z += fz;
-          vel[nodes[j].id].x -= fx; vel[nodes[j].id].y -= fy; vel[nodes[j].id].z -= fz;
-        }
-      }
-
-      // Attraction (edges)
-      edges.forEach(e => {
-        const a = pos[e.source], b = pos[e.target];
-        if (!a || !b) return;
-        let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        let dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 0.1;
-        let force = (dist - 15) * 0.01 * temp;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        const fz = (dz / dist) * force;
-        vel[e.source].x += fx; vel[e.source].y += fy; vel[e.source].z += fz;
-        vel[e.target].x -= fx; vel[e.target].y -= fy; vel[e.target].z -= fz;
+  } else {
+    nodes.forEach(function(n){
+      positions[n.id]={x:(Math.random()-.5)*150,y:(Math.random()-.5)*60,z:(Math.random()-.5)*150};
+    });
+    for(var iter=0;iter<80;iter++){
+      nodes.forEach(function(n){
+        var p=positions[n.id];if(!p)return;
+        nodes.forEach(function(m){
+          if(n.id===m.id)return;
+          var q=positions[m.id];if(!q)return;
+          var dx=p.x-q.x,dy=p.y-q.y,dz=p.z-q.z;
+          var d=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;
+          if(d<25){var f=(25-d)*.15/d;p.x+=dx*f;p.y+=dy*f;p.z+=dz*f;}
+        });
       });
-
-      // Center gravity
-      nodes.forEach(n => {
-        vel[n.id].x -= pos[n.id].x * 0.001 * temp;
-        vel[n.id].y -= pos[n.id].y * 0.001 * temp;
-        vel[n.id].z -= pos[n.id].z * 0.001 * temp;
-      });
-
-      // Apply velocity
-      nodes.forEach(n => {
-        const speed = Math.sqrt(vel[n.id].x**2 + vel[n.id].y**2 + vel[n.id].z**2);
-        if (speed > 0.1) {
-          pos[n.id].x += vel[n.id].x * 0.5;
-          pos[n.id].y += vel[n.id].y * 0.5;
-          pos[n.id].z += vel[n.id].z * 0.5;
-        }
-        vel[n.id].x *= 0.8; vel[n.id].y *= 0.8; vel[n.id].z *= 0.8;
+      edges.forEach(function(e){
+        var a=positions[e.source],b=positions[e.target];
+        if(!a||!b)return;
+        var dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+        var d=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;
+        var f=(d-20)*.02;
+        a.x+=dx*f/d;a.y+=dy*f/d;a.z+=dz*f/d;
+        b.x-=dx*f/d;b.y-=dy*f/d;b.z-=dz*f/d;
       });
     }
-    return pos;
   }
+  updatePositions();
+}
 
-  // ========== RADIAL LAYOUT ==========
-  function radialLayout(nodes) {
-    const groups = {};
-    nodes.forEach(n => {
-      const g = n.kind;
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(n);
-    });
-    const kinds = Object.keys(groups);
-    const pos = {};
-    kinds.forEach((kind, ki) => {
-      const angle0 = (ki / kinds.length) * Math.PI * 2;
-      const groupNodes = groups[kind];
-      const radius = 30 + ki * 25;
-      groupNodes.forEach((n, ni) => {
-        const a = angle0 + (ni / groupNodes.length) * (Math.PI * 2 / kinds.length);
-        pos[n.id] = {
-          x: Math.cos(a) * radius,
-          y: (Math.random() - 0.5) * 20,
-          z: Math.sin(a) * radius
-        };
-      });
-    });
-    return pos;
-  }
+function updatePositions(){
+  nodes.forEach(function(n){
+    var mesh=meshGroup.children.find(function(c){return c.userData&&c.userData.nodeId===n.id});
+    var p=positions[n.id];
+    if(mesh&&p){mesh.position.set(p.x,p.y,p.z);}
+    var label=labelGroup.children.find(function(c){return c.userData&&c.userData.nodeId===n.id});
+    if(label&&p){label.position.set(p.x,p.y+4,p.z);}
+  });
+  edgesGroup.children.forEach(function(line){
+    var sp=positions[line.userData.source];
+    var tp=positions[line.userData.target];
+    if(sp&&tp){
+      var pts=[new THREE.Vector3(sp.x,sp.y,sp.z),new THREE.Vector3(tp.x,tp.y,tp.z)];
+      line.geometry.dispose();
+      line.geometry=new THREE.BufferGeometry().setFromPoints(pts);
+    }
+  });
+}
 
-  // ========== BUILD 3D SCENE ==========
-  function buildGraph(data) {
-    meshGroup.clear();
-    labelGroup.clear();
-    nodeMeshMap.clear();
-    nodeById.clear();
-    nodes = data.nodes;
-    edges = data.edges;
+function resetParticlePositions(){
+  particleGroup.children.forEach(function(p){
+    var sp=positions[p.userData.source];
+    var tp=positions[p.userData.target];
+    if(sp) p.userData.startPos=new THREE.Vector3(sp.x,sp.y,sp.z);
+    if(tp) p.userData.endPos=new THREE.Vector3(tp.x,tp.y,tp.z);
+  });
+}
 
-    nodes.forEach(n => nodeById.set(n.id, n));
-
-    const positions = forceLayout(nodes, edges);
-    const canvas2d = document.createElement('canvas');
-    const ctx2d = canvas2d.getContext('2d');
-
-    // Draw nodes
-    nodes.forEach(n => {
-      const pos = positions[n.id];
-      if (!pos) return;
-
-      const radius = n.size * 1.2 + Math.log2(Math.max(2, n.tokens)) * 0.3;
-      const geo = new THREE.SphereGeometry(radius, 16, 12);
-      const color = new THREE.Color(n.color);
-      const mat = new THREE.MeshPhongMaterial({
-        color: color,
-        emissive: color.clone().multiplyScalar(0.15),
-        transparent: true,
-        opacity: 0.9,
-        shininess: 40,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(pos.x, pos.y, pos.z);
-      mesh.userData = {nodeId: n.id, nodeData: n};
-      meshGroup.add(mesh);
-      nodeMeshMap.set(n.id, mesh);
-
-      // Glow ring
-      const ringGeo = new THREE.RingGeometry(radius * 1.3, radius * 1.6, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.1,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.copy(mesh.position);
-      ring.lookAt(camera.position);
-      meshGroup.add(ring);
-
-      // Label
-      canvas2d.width = 256; canvas2d.height = 64;
-      ctx2d.clearRect(0, 0, 256, 64);
-      ctx2d.font = '14px Consolas, monospace';
-      ctx2d.fillStyle = '#ffffff';
-      ctx2d.textAlign = 'center';
-      const label = n.name.length > 20 ? n.name.slice(0, 18) + '..' : n.name;
-      ctx2d.fillText(label, 128, 30);
-
-      const tex = new THREE.CanvasTexture(canvas2d);
-      const spriteMat = new THREE.SpriteMaterial({map: tex, transparent: true, opacity: 0.8});
-      const sprite = new THREE.Sprite(spriteMat);
-      sprite.position.set(pos.x, pos.y + radius + 3, pos.z);
-      sprite.scale.set(16, 4, 1);
-      sprite.userData = {isLabel: true};
-      labelGroup.add(sprite);
-    });
-
-    // Draw edges
-    const edgeColors = {
-      'IMPORTS': 0x4a9eff,
-      'DECLARES': 0x8b949e,
-      'CALLS': 0x6bcb77,
-      'CONTAINS': 0xffd93d,
-      'INHERITS': 0xff6b6b,
-      'REFERENCES': 0x4ecdc4,
-    };
-
-    edges.forEach(e => {
-      const sPos = positions[e.source];
-      const tPos = positions[e.target];
-      if (!sPos || !tPos) return;
-
-      const points = [new THREE.Vector3(sPos.x, sPos.y, sPos.z), new THREE.Vector3(tPos.x, tPos.y, tPos.z)];
-      const geo = new THREE.BufferGeometry().setFromPoints(points);
-      const color = edgeColors[e.kind] || 0x333355;
-      const mat = new THREE.LineBasicMaterial({color, transparent: true, opacity: 0.25});
-      const line = new THREE.Line(geo, mat);
-      meshGroup.add(line);
-    });
-  }
-
-  // ========== HOVER / CLICK ==========
-  function checkHover(e) {
-    raycaster.setFromCamera(mouse, camera);
-    const meshes = [];
-    meshGroup.children.forEach(c => { if (c.isMesh && c.userData.nodeData) meshes.push(c); });
-    const intersects = raycaster.intersectObjects(meshes);
-
-    const tooltip = document.getElementById('tooltip');
-    if (intersects.length > 0) {
-      const nd = intersects[0].object.userData.nodeData;
-      tooltip.style.display = 'block';
-      tooltip.style.left = (e.clientX + 15) + 'px';
-      tooltip.style.top = (e.clientY + 15) + 'px';
-      document.getElementById('tt-name').textContent = nd.name;
-      document.getElementById('tt-kind').textContent = nd.kind;
-      document.getElementById('tt-tokens').textContent = nd.tokens + ' tokens';
-      document.getElementById('tt-file').textContent = nd.filePath;
-      renderer.domElement.style.cursor = 'pointer';
-      hoveredNode = nd;
+function highlightConnected(nodeId){
+  edgesGroup.children.forEach(function(line){
+    var u=line.userData;
+    if(u.source===nodeId||u.target===nodeId){
+      line.material.opacity=1;line.material.color.set(0x58a6ff);
     } else {
-      tooltip.style.display = 'none';
-      renderer.domElement.style.cursor = 'default';
-      hoveredNode = null;
+      line.material.opacity=.12;line.material.color.set(new THREE.Color(edgeColors[u.kind]||'#333'));
     }
-  }
-
-  function checkClick(e) {
-    raycaster.setFromCamera(mouse, camera);
-    const meshes = [];
-    meshGroup.children.forEach(c => { if (c.isMesh && c.userData.nodeData) meshes.push(c); });
-    const intersects = raycaster.intersectObjects(meshes);
-
-    if (intersects.length > 0) {
-      const nd = intersects[0].object.userData.nodeData;
-      selectNode(nd);
-    }
-  }
-
-  function selectNode(nd) {
-    selectedNode = nd;
-    document.getElementById('node-detail').classList.add('visible');
-    document.getElementById('detail-name').textContent = nd.name;
-    document.getElementById('detail-kind').textContent = nd.kind;
-    document.getElementById('detail-file').textContent = nd.filePath || '-';
-    document.getElementById('detail-line').textContent = nd.line || '-';
-    document.getElementById('detail-tokens').textContent = nd.tokens;
-    document.getElementById('detail-code').textContent = nd.signature || '(no signature)';
-
-    // Highlight in 3D
-    meshGroup.children.forEach(c => {
-      if (c.isMesh && c.userData.nodeData) {
-        c.material.emissive.set(c.userData.nodeData.color);
-        c.material.emissive.multiplyScalar(0.15);
-        c.material.opacity = 0.5;
-      }
-    });
-    const mesh = nodeMeshMap.get(nd.id);
-    if (mesh) {
-      mesh.material.emissive.set(0xffffff);
-      mesh.material.emissive.multiplyScalar(0.4);
-      mesh.material.opacity = 1.0;
-    }
-  }
-
-  // ========== UI ==========
-  // Tabs
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    });
   });
-
-  // Controls
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    spherical = {radius: 180, theta: 0, phi: Math.PI / 4};
-    target.set(0, 0, 0);
-    updateCamera();
+  meshGroup.children.forEach(function(mesh){
+    var id=mesh.userData.nodeId;
+    if(id===nodeId){mesh.material.emissive.set(0x58a6ff);mesh.scale.set(1.8,1.8,1.8);return;}
+    var connected=edges.some(function(e){return(e.source===nodeId&&e.target===id)||(e.target===nodeId&&e.source===id)});
+    if(connected){mesh.material.emissive.set(0x58a6ff);mesh.scale.set(1.3,1.3,1.3);}
+    else{var c=kindColors[mesh.userData.nodeData.kind]||0x999999;mesh.material.emissive.set(new THREE.Color(c).multiplyScalar(.15));mesh.scale.set(1,1,1);}
   });
-
-  document.getElementById('btn-labels').addEventListener('click', () => {
-    showLabels = !showLabels;
-    labelGroup.visible = showLabels;
-    document.getElementById('btn-labels').classList.toggle('active', showLabels);
+  particleGroup.children.forEach(function(p){
+    if(p.userData.source===nodeId||p.userData.target===nodeId){p.material.opacity=1;p.material.color.set(0xffd93d);p.scale.set(1.8,1.8,1.8);}
+    else{p.material.opacity=particlesOn?.15:0;}
   });
-
-  document.getElementById('btn-force').addEventListener('click', () => {
-    if (!graphData) return;
-    const pos = forceLayout(nodes, edges);
-    applyPositions(pos);
-    document.getElementById('btn-force').classList.add('active');
-    document.getElementById('btn-radial').classList.remove('active');
-  });
-
-  document.getElementById('btn-radial').addEventListener('click', () => {
-    if (!graphData) return;
-    const pos = radialLayout(nodes);
-    applyPositions(pos);
-    document.getElementById('btn-radial').classList.add('active');
-    document.getElementById('btn-force').classList.remove('active');
-  });
-
-  function applyPositions(pos) {
-    meshGroup.children.forEach(c => {
-      if (c.isMesh && c.userData.nodeData) {
-        const p = pos[c.userData.nodeData.id];
-        if (p) c.position.set(p.x, p.y, p.z);
-      }
-      if (c.isLine) meshGroup.remove(c);
-    });
-    // Rebuild edges
-    const edgeColors = {
-      'IMPORTS': 0x4a9eff, 'DECLARES': 0x8b949e, 'CALLS': 0x6bcb77,
-      'CONTAINS': 0xffd93d, 'INHERITS': 0xff6b6b, 'REFERENCES': 0x4ecdc4,
-    };
-    edges.forEach(e => {
-      const sMesh = nodeMeshMap.get(e.source);
-      const tMesh = nodeMeshMap.get(e.target);
-      if (!sMesh || !tMesh) return;
-      const points = [sMesh.position.clone(), tMesh.position.clone()];
-      const geo = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({color: edgeColors[e.kind] || 0x333355, transparent: true, opacity: 0.25});
-      meshGroup.add(new THREE.Line(geo, mat));
-    });
-    // Update labels
-    let li = 0;
-    labelGroup.children.forEach(s => {
-      if (s.isSprite) {
-        const nm = [...nodeMeshMap.values()][li];
-        if (nm) {
-          const r = nm.geometry.parameters.radius || 2;
-          s.position.set(nm.position.x, nm.position.y + r + 3, nm.position.z);
+  flowGroup.children.forEach(function(f){scene.remove(f);});
+  flowGroup=new THREE.Group();scene.add(flowGroup);
+  if(nodeId){
+    edges.forEach(function(e){
+      if(e.source===nodeId||e.target===nodeId){
+        var sp=positions[e.source],tp=positions[e.target];
+        if(sp&&tp){
+          var dir=new THREE.Vector3(tp.x-sp.x,tp.y-sp.y,tp.z-sp.z).normalize();
+          var arrow=new THREE.ArrowHelper(dir,new THREE.Vector3(sp.x,sp.y,sp.z),20,0xffd93d,.8,.4);
+          flowGroup.add(arrow);
         }
-        li++;
       }
     });
   }
+}
 
-  function populateSidebar(graphData, tokenMetrics) {
-    // Stats
-    const s = tokenMetrics.summary;
-    document.getElementById('stats-grid').innerHTML = `
-      <div class="stat-card"><div class="label">Nodes</div><div class="value blue">${s.totalNodes}</div></div>
-      <div class="stat-card"><div class="label">Edges</div><div class="value blue">${s.totalEdges}</div></div>
-      <div class="stat-card"><div class="label">Files</div><div class="value green">${s.totalFiles}</div></div>
-      <div class="stat-card"><div class="label">Symbols</div><div class="value yellow">${s.totalSymbols}</div></div>
-      <div class="stat-card"><div class="label">L0 Tokens</div><div class="value green">${s.architectureTokens}</div></div>
-      <div class="stat-card"><div class="label">L1 Total</div><div class="value blue">${s.totalSkeletonTokens}</div></div>
-      <div class="stat-card"><div class="label">L3 Total</div><div class="value red">${s.totalImplementationTokens}</div></div>
-    `;
+function selectNode(nodeData){
+  selectedNode=nodeData;
+  document.getElementById('detail-name').textContent=nodeData.name;
+  document.getElementById('detail-kind').textContent='Type: '+nodeData.kind;
+  document.getElementById('detail-file').textContent='File: '+nodeData.filePath+':'+nodeData.line;
+  document.getElementById('detail-tokens').textContent='Tokens: '+nodeData.tokens;
+  document.getElementById('detail-code').textContent=nodeData.signature||'(no signature)';
+  document.getElementById('node-detail').classList.add('visible');
+  highlightConnected(nodeData.id);
+  traceFlow(nodeData.name);
+  switchTab('overview');
+}
 
-    // Token bars
-    const zc = tokenMetrics.zoomComparison;
-    const maxT = Math.max(zc.L0, zc.L1Avg, zc.L2Avg, zc.L3Avg) || 1;
-    document.getElementById('token-bars').innerHTML = `
-      <div class="bar-row"><div class="bar-label">L0</div><div class="bar-container"><div class="bar-fill l0" style="width:${(zc.L0/maxT*100).toFixed(1)}%">${zc.L0} tok</div></div></div>
-      <div class="bar-row"><div class="bar-label">L1</div><div class="bar-container"><div class="bar-fill l1" style="width:${(zc.L1Avg/maxT*100).toFixed(1)}%">${zc.L1Avg} tok</div></div></div>
-      <div class="bar-row"><div class="bar-label">L2</div><div class="bar-container"><div class="bar-fill l2" style="width:${(zc.L2Avg/maxT*100).toFixed(1)}%">${zc.L2Avg} tok</div></div></div>
-      <div class="bar-row"><div class="bar-label">L3</div><div class="bar-container"><div class="bar-fill l3" style="width:${(zc.L3Avg/maxT*100).toFixed(1)}%">${zc.L3Avg} tok</div></div></div>
-    `;
+async function traceFlow(name){
+  try{
+    var resp=await fetch('/api/flow?symbol='+encodeURIComponent(name));
+    flowData=await resp.json();
+    if(flowData.error)return;
+    flowStep=-1;
+    document.getElementById('flow-title').textContent='Flow: '+name;
+    document.getElementById('token-anim').classList.add('visible');
+    renderFlowSteps();
+    switchTab('flow');
+  }catch(e){console.error(e)}
+}
 
-    // Token details
-    let detailHtml = '<h4 style="font-size:12px;color:#8b949e;margin:16px 0 8px">Per-Symbol Breakdown</h4>';
-    tokenMetrics.symbols.slice(0, 30).forEach(s => {
-      detailHtml += `<div class="bar-row"><div class="bar-label" style="width:100px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap" title="${s.name}">${s.name}</div><div class="bar-container"><div class="bar-fill l1" style="width:${Math.min(100, s.skeletonTokens/2)}%">${s.skeletonTokens}</div></div><div class="bar-container" style="margin-left:4px"><div class="bar-fill l3" style="width:${Math.min(100, s.fullTokens/10)}%">${s.fullTokens}</div></div></div>`;
-    });
-    document.getElementById('token-details').innerHTML = detailHtml;
+function renderFlowSteps(){
+  var c=document.getElementById('flow-steps');c.innerHTML='';
+  if(!flowData||!flowData.sequence)return;
+  var totalTokens=flowData.totalTokens||1;
+  var consumed=0;
+  flowData.sequence.forEach(function(s,i){
+    var cls=i<flowStep?'done':i===flowStep?'active':'';
+    if(i<=flowStep)consumed+=s.tokens;
+    c.innerHTML+='<div class="flow-step '+cls+'"><div class="step-num">'+(i+1)+'</div><div class="step-name">'+s.name+' <span style="color:#6e7681;font-size:9px">'+s.kind+'</span></div><div class="step-tokens">'+s.tokens+' tok</div></div>';
+  });
+  document.getElementById('token-counter').textContent=consumed;
+  document.getElementById('token-bar').style.width=(consumed/totalTokens*100)+'%';
+  document.getElementById('tok-l0').textContent=consumed;
+  document.getElementById('tok-l1').textContent=Math.round(consumed*.6);
+  document.getElementById('tok-l2').textContent=Math.round(consumed*.3);
+  document.getElementById('tok-l3').textContent=Math.round(consumed*.1);
+}
 
-    // Symbol list
-    let listHtml = '';
-    tokenMetrics.symbols.forEach(s => {
-      listHtml += `<li class="symbol-item" data-id="${s.name}"><div class="name">${s.name}</div><div class="meta">${s.kind} - ${s.file}:${s.line}</div><div class="tokens">${s.fullTokens} tok</div></li>`;
-    });
-    document.getElementById('symbol-list').innerHTML = listHtml;
-
-    document.querySelectorAll('.symbol-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const name = item.dataset.id;
-        const nd = nodes.find(n => n.name === name);
-        if (nd) {
-          selectNode(nd);
-          const mesh = nodeMeshMap.get(nd.id);
-          if (mesh) {
-            target.copy(mesh.position);
-            spherical.radius = 40;
-            updateCamera();
-          }
-        }
-      });
-    });
-  }
-
-  // ========== LOAD DATA ==========
-  async function init() {
-    try {
-      const [graphRes, tokenRes] = await Promise.all([
-        fetch('/api/graph'),
-        fetch('/api/tokens'),
-      ]);
-      graphData = await graphRes.json();
-      tokenMetrics = await tokenRes.json();
-
-      buildGraph(graphData);
-      populateSidebar(graphData, tokenMetrics);
-
-      document.getElementById('loading').style.display = 'none';
-    } catch (err) {
-      document.getElementById('loading').innerHTML = `<p style="color:#ff6b6b">Error loading graph: ${err.message}</p>`;
+function advanceFlow(){
+  if(!flowData||!flowData.sequence)return false;
+  if(flowStep>=flowData.sequence.length-1)return false;
+  flowStep++;
+  renderFlowSteps();
+  var step=flowData.sequence[flowStep];
+  if(step&&step.nodeId){
+    var mesh=meshGroup.children.find(function(c){return c.userData&&c.userData.nodeId===step.nodeId});
+    if(mesh){
+      mesh.material.emissive.set(0x6bcb77);
+      mesh.scale.set(2.2,2.2,2.2);
+      var p=positions[step.nodeId];
+      if(p){
+        camTarget.set(p.x,p.y,p.z);
+        camDist=80;
+        updateCamera();
+      }
+      setTimeout(function(){
+        mesh.material.emissive.set(new THREE.Color(kindColors[step.kind]||0x999999).multiplyScalar(.3));
+        mesh.scale.set(1.3,1.3,1.3);
+      },400);
+    }
+    if(flowStep>0){
+      var prev=flowData.sequence[flowStep-1];
+      highlightFlowEdge(prev.nodeId,step.nodeId);
     }
   }
+  return true;
+}
 
-  // ========== ANIMATION LOOP ==========
-  function animate() {
-    requestAnimationFrame(animate);
-    // Slowly rotate rings to face camera
-    meshGroup.children.forEach(c => {
-      if (c.isMesh && !c.userData.nodeData && c.geometry.type === 'RingGeometry') {
-        c.lookAt(camera.position);
-      }
-    });
-    renderer.render(scene, camera);
+function highlightFlowEdge(fromId,toId){
+  flowGroup.children.forEach(function(c){flowGroup.remove(c)});
+  var sp=positions[fromId],tp=positions[toId];
+  if(!sp||!tp)return;
+  var mid=new THREE.Vector3((sp.x+tp.x)/2,(sp.y+tp.y)/2+2,(sp.z+tp.z)/2);
+  var geom=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(sp.x,sp.y,sp.z),mid,new THREE.Vector3(tp.x,tp.y,tp.z)]);
+  var mat=new THREE.LineBasicMaterial({color:0x6bcb77,linewidth:2,transparent:true,opacity:.9});
+  var line=new THREE.Line(geom,mat);
+  flowGroup.add(line);
+  var pulseGeom=new THREE.SphereGeometry(1.5,8,8);
+  var pulseMat=new THREE.MeshBasicMaterial({color:0x6bcb77,transparent:true,opacity:.7});
+  var pulse=new THREE.Mesh(pulseGeom,pulseMat);
+  pulse.position.set(tp.x,tp.y,tp.z);
+  flowGroup.add(pulse);
+  var t=0;
+  var pulseAnim=setInterval(function(){
+    t+=.05;
+    pulse.scale.set(1+t*3,1+t*3,1+t*3);
+    pulseMat.opacity=Math.max(0,.7-t);
+    if(t>1){clearInterval(pulseAnim);flowGroup.remove(pulse);}
+  },16);
+}
+
+function playFlow(){
+  if(flowTimer){clearInterval(flowTimer);flowTimer=null;document.getElementById('btn-flow-play').textContent='Play';document.getElementById('btn-flow-play').classList.remove('playing');return;}
+  document.getElementById('btn-flow-play').textContent='Pause';
+  document.getElementById('btn-flow-play').classList.add('playing');
+  flowTimer=setInterval(function(){
+    if(!advanceFlow()){clearInterval(flowTimer);flowTimer=null;document.getElementById('btn-flow-play').textContent='Play';document.getElementById('btn-flow-play').classList.remove('playing');}
+  },1200);
+}
+
+function resetFlow(){
+  if(flowTimer){clearInterval(flowTimer);flowTimer=null;}
+  flowStep=-1;
+  document.getElementById('btn-flow-play').textContent='Play';
+  document.getElementById('btn-flow-play').classList.remove('playing');
+  renderFlowSteps();
+  flowGroup.children.forEach(function(c){flowGroup.remove(c)});
+  camTarget.set(0,0,0);camDist=180;camAngle.x=0;camAngle.y=0;updateCamera();
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===name)});
+  document.querySelectorAll('.tab-content').forEach(function(c){c.classList.toggle('active',c.id==='tab-'+name)});
+}
+
+document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){switchTab(this.dataset.tab)})});
+
+document.querySelectorAll('.symbol-item').forEach(function(li){
+  li.addEventListener('click',function(){
+    var id=this.dataset.id;
+    var n=nodeById[id];
+    if(n)selectNode(n);
+  });
+});
+
+document.getElementById('btn-flow-play').addEventListener('click',playFlow);
+document.getElementById('btn-flow-step').addEventListener('click',function(){advanceFlow()});
+document.getElementById('btn-flow-reset').addEventListener('click',resetFlow);
+document.getElementById('btn-force').addEventListener('click',function(){applyLayout('force');document.getElementById('btn-force').classList.add('active');document.getElementById('btn-radial').classList.remove('active')});
+document.getElementById('btn-radial').addEventListener('click',function(){applyLayout('radial');document.getElementById('btn-radial').classList.add('active');document.getElementById('btn-force').classList.remove('active')});
+document.getElementById('btn-reset').addEventListener('click',function(){camTarget.set(0,0,0);camDist=180;camAngle.x=0;camAngle.y=0;updateCamera()});
+document.getElementById('btn-labels').addEventListener('click',function(){showLabels=!showLabels;this.classList.toggle('active',showLabels);labelGroup.children.forEach(function(l){l.visible=showLabels})});
+document.getElementById('btn-particles').addEventListener('click',function(){particlesOn=!particlesOn;this.classList.toggle('active',particlesOn);particleGroup.children.forEach(function(p){p.material.opacity=particlesOn?.8:0})});
+
+renderer.domElement.addEventListener('mousedown',function(e){if(e.button===0){isOrbiting=true;prevMouse={x:e.clientX,y:e.clientY}}});
+window.addEventListener('mouseup',function(){isOrbiting=false});
+window.addEventListener('mousemove',function(e){
+  if(isOrbiting){
+    camAngle.x+=(e.clientX-prevMouse.x)*.005;
+    camAngle.y=Math.max(-1.2,Math.min(1.2,camAngle.y+(e.clientY-prevMouse.y)*.005));
+    prevMouse={x:e.clientX,y:e.clientY};updateCamera();
   }
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  var hits=raycaster.intersectObjects(meshGroup.children);
+  var tt=document.getElementById('tooltip');
+  if(hits.length>0&&hits[0].object.userData.nodeData){
+    var n=hits[0].object.userData.nodeData;
+    document.getElementById('tt-name').textContent=n.name;
+    document.getElementById('tt-kind').textContent=n.kind;
+    document.getElementById('tt-tokens').textContent=n.tokens+' tokens';
+    document.getElementById('tt-file').textContent=n.filePath+':'+n.line;
+    tt.style.display='block';tt.style.left=(e.clientX+14)+'px';tt.style.top=(e.clientY-10)+'px';
+    renderer.domElement.style.cursor='pointer';
+  } else {
+    tt.style.display='none';renderer.domElement.style.cursor='grab';
+  }
+});
+renderer.domElement.addEventListener('wheel',function(e){camDist=Math.max(30,Math.min(500,camDist+e.deltaY*.3));updateCamera()});
+renderer.domElement.addEventListener('click',function(e){
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  var hits=raycaster.intersectObjects(meshGroup.children);
+  if(hits.length>0&&hits[0].object.userData.nodeData)selectNode(hits[0].object.userData.nodeData);
+});
 
-  init();
-  animate();
+async function loadData(){
+  var gResp=await fetch('/api/graph');
+  var tResp=await fetch('/api/tokens');
+  var gData=await gResp.json();
+  var tData=await tResp.json();
+  nodes=gData.nodes;edges=gData.edges;
+  nodes.forEach(function(n){nodeById[n.id]=n});
+
+  edges.forEach(function(e){
+    var color=edgeColors[e.kind]||'#333';
+    var mat=new THREE.LineBasicMaterial({color:new THREE.Color(color),transparent:true,opacity:.4});
+    var pts=[new THREE.Vector3(),new THREE.Vector3()];
+    var geom=new THREE.BufferGeometry().setFromPoints(pts);
+    var line=new THREE.Line(geom,mat);
+    line.userData={source:e.source,target:e.target,kind:e.kind};
+    edgesGroup.add(line);
+  });
+
+  nodes.forEach(function(n){
+    var color=kindColors[n.kind]||0x999999;
+    var size=kindSizes[n.kind]||1;
+    var geom=new THREE.IcosahedronGeometry(size,1);
+    var mat=new THREE.MeshPhongMaterial({color:color,emissive:new THREE.Color(color).multiplyScalar(.25),shininess:60,transparent:true,opacity:.88});
+    var mesh=new THREE.Mesh(geom,mat);
+    mesh.userData={nodeId:n.id,nodeData:n};
+    meshGroup.add(mesh);
+    var label=createTextSprite(n.name,'#'+new THREE.Color(color).getHexString());
+    label.visible=showLabels;
+    labelGroup.add(label);
+  });
+
+  edges.filter(function(e){return e.kind==='CALLS'}).forEach(function(e){
+    var sp=positions[e.source]||{x:0,y:0,z:0};
+    var tp=positions[e.target]||{x:0,y:0,z:0};
+    var geom=new THREE.SphereGeometry(.6,6,6);
+    var mat=new THREE.MeshBasicMaterial({color:0x58a6ff,transparent:true,opacity:.8});
+    var p=new THREE.Mesh(geom,mat);
+    p.userData={source:e.source,target:e.target,t:Math.random(),speed:.003+Math.random()*.004};
+    p.position.set(sp.x,sp.y,sp.z);
+    particleGroup.add(p);
+  });
+
+  var sg=document.getElementById('stats-grid');
+  sg.innerHTML='<div class="stat-card"><div class="label">Nodes</div><div class="value b">'+nodes.length+'</div></div>'+
+    '<div class="stat-card"><div class="label">Edges</div><div class="value g">'+edges.length+'</div></div>'+
+    '<div class="stat-card"><div class="label">Tokens L3</div><div class="value y">'+(tData.L3?tData.L3.total_tokens:0)+'</div></div>'+
+    '<div class="stat-card"><div class="label">Reduction</div><div class="value r">'+(tData.L3?tData.L3.reduction_pct:0)+'%</div></div>';
+
+  var tb=document.getElementById('token-bars');
+  var maxTok=Math.max.apply(null,Object.keys(tData).map(function(k){return tData[k].total_tokens||0}).concat([1]));
+  ['L0','L1','L2','L3'].forEach(function(l){
+    var d=tData[l]||{total_tokens:0};
+    var pct=(d.total_tokens/maxTok*100).toFixed(0);
+    tb.innerHTML+='<div class="bar-row"><div class="bar-label">'+l+'</div><div class="bar-container"><div class="bar-fill '+l.toLowerCase()+'" style="width:'+pct+'%">'+d.total_tokens+' tok</div></div></div>';
+  });
+
+  var sl=document.getElementById('symbol-list');
+  nodes.filter(function(n){return n.kind!=='FILE'&&n.kind!=='CHUNK'}).forEach(function(n){
+    sl.innerHTML+='<li class="symbol-item" data-id="'+n.id+'"><div class="tokens">'+n.tokens+' tok</div><div class="name">'+n.name+'</div><div class="meta">'+n.kind+' - '+(n.filePath.split('/').pop())+':'+n.line+'</div></li>';
+  });
+  document.querySelectorAll('.symbol-item').forEach(function(li){
+    li.addEventListener('click',function(){
+      var id=this.dataset.id;
+      var n=nodeById[id];
+      if(n)selectNode(n);
+    });
+  });
+
+  applyLayout('force');
+  document.getElementById('loading').style.display='none';
+}
+
+loadData();
 })();
 </script>
 </body>

@@ -27,6 +27,10 @@ class GraphAPIHandler(SimpleHTTPRequestHandler):
             self._serve_token_metrics()
         elif path == "/api/stats":
             self._serve_stats()
+        elif path.startswith("/api/flow"):
+            params = parse_qs(parsed.query)
+            symbol = params.get("symbol", [""])[0]
+            self._serve_flow(symbol)
         else:
             self.send_error(404)
 
@@ -118,6 +122,86 @@ class GraphAPIHandler(SimpleHTTPRequestHandler):
 
         data = {"nodes": nodes_json, "edges": edges_json}
         self._send_json(data)
+
+    def _serve_flow(self, symbol_name: str):
+        """Return flow trace data for a given symbol — callers chain, callees chain, full path."""
+        store = self.cpg.store
+        target_node = None
+
+        for kind in [NodeKind.FUNCTION, NodeKind.CLASS, NodeKind.METHOD]:
+            for node in store.get_nodes_by_kind(kind):
+                if node.name == symbol_name:
+                    target_node = node
+                    break
+            if target_node:
+                break
+
+        if not target_node:
+            self._send_json({"error": f"Symbol '{symbol_name}' not found"})
+            return
+
+        # BFS to find the full call chain (up to 4 hops)
+        visited = {target_node.id}
+        layers = [[{"id": target_node.id, "name": target_node.name, "kind": target_node.kind.value, "tokens": target_node.metadata.get("token_count_full", 0)}]]
+
+        current_layer = {target_node.id}
+        for depth in range(4):
+            next_layer = []
+            for nid in current_layer:
+                # Outgoing (callees)
+                for edge in store.get_edges(source_id=nid):
+                    if edge.kind == EdgeKind.CALLS and edge.target_id not in visited:
+                        visited.add(edge.target_id)
+                        n = store.get_node(edge.target_id)
+                        if n:
+                            next_layer.append({"id": n.id, "name": n.name, "kind": n.kind.value, "tokens": n.metadata.get("token_count_full", 0)})
+                # Incoming (callers)
+                for edge in store.get_edges(target_id=nid):
+                    if edge.kind == EdgeKind.CALLS and edge.source_id not in visited:
+                        visited.add(edge.source_id)
+                        n = store.get_node(edge.source_id)
+                        if n:
+                            next_layer.append({"id": n.id, "name": n.name, "kind": n.kind.value, "tokens": n.metadata.get("token_count_full", 0)})
+            if next_layer:
+                layers.append(next_layer)
+                current_layer = {n["id"] for n in next_layer}
+
+        # Build flow edges (connections between layers)
+        flow_edges = []
+        for i in range(len(layers) - 1):
+            for src in layers[i]:
+                for tgt in layers[i + 1]:
+                    # Check if edge exists in either direction
+                    edges_out = [e for e in store.get_edges(source_id=src["id"]) if e.target_id == tgt["id"]]
+                    edges_in = [e for e in store.get_edges(target_id=src["id"]) if e.source_id == tgt["id"]]
+                    if edges_out or edges_in:
+                        direction = "outgoing" if edges_out else "incoming"
+                        flow_edges.append({
+                            "source": src["id"],
+                            "target": tgt["id"],
+                            "direction": direction,
+                            "depth": i,
+                        })
+
+        # Build the execution sequence for simulation
+        sequence = []
+        for i, layer in enumerate(layers):
+            for node in layer:
+                sequence.append({
+                    "step": i,
+                    "nodeId": node["id"],
+                    "name": node["name"],
+                    "kind": node["kind"],
+                    "tokens": node["tokens"],
+                })
+
+        self._send_json({
+            "target": {"id": target_node.id, "name": target_node.name},
+            "layers": layers,
+            "flowEdges": flow_edges,
+            "sequence": sequence,
+            "totalTokens": sum(n["tokens"] for layer in layers for n in layer),
+        })
 
     def _serve_token_metrics(self):
         """Return token consumption metrics for each zoom level."""
