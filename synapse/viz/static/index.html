@@ -137,7 +137,7 @@ body{background:#060610;color:#e0e0e0;font-family:'Consolas','Fira Code',monospa
   <button class="ctrl-btn active" id="btn-particles">Particles</button>
 </div>
 <div id="tooltip"><div class="tn" id="tt-name"></div><div class="tk" id="tt-kind"></div><div class="tt" id="tt-tokens"></div><div class="tf" id="tt-file"></div></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/three.min.js"></script>
 <script>
 (function(){
 var nodes=[],edges=[],positions={};
@@ -545,10 +545,27 @@ async function loadData(){
   });
 
   applyLayout('force');
+  resetParticlePositions();
   document.getElementById('loading').style.display='none';
 }
 
+function animate(){
+  requestAnimationFrame(animate);
+  if(particlesOn){
+    particleGroup.children.forEach(function(p){
+      if(!p.userData.startPos||!p.userData.endPos)return;
+      p.userData.t+=p.userData.speed;
+      if(p.userData.t>1)p.userData.t=0;
+      var t=p.userData.t;
+      p.position.lerpVectors(p.userData.startPos,p.userData.endPos,t);
+      p.material.opacity=.3+.5*Math.sin(t*Math.PI);
+    });
+  }
+  renderer.render(scene,camera);
+}
+
 loadData();
+animate();
 })();
 </script>
 </body>

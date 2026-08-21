@@ -32,7 +32,7 @@ class GraphAPIHandler(SimpleHTTPRequestHandler):
             symbol = params.get("symbol", [""])[0]
             self._serve_flow(symbol)
         else:
-            self.send_error(404)
+            self._serve_static(path.lstrip("/"))
 
     def _serve_html(self):
         html_path = Path(__file__).parent / "static" / "index.html"
@@ -41,6 +41,29 @@ class GraphAPIHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(content.encode("utf-8"))
+
+    def _serve_static(self, filename: str):
+        """Serve a file from the static directory."""
+        static_dir = Path(__file__).parent / "static"
+        file_path = static_dir / filename
+        if not file_path.exists() or not file_path.is_file():
+            self.send_error(404)
+            return
+        ext = file_path.suffix.lower()
+        content_types = {
+            ".js": "application/javascript",
+            ".css": "text/css",
+            ".png": "image/png",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon",
+        }
+        ct = content_types.get(ext, "application/octet-stream")
+        content = file_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ct)
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
     def _serve_graph_data(self):
         """Return nodes and edges as JSON for Three.js."""
