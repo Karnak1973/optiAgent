@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Any
+from rich.console import Console
 import rich.progress as progress
+
+console = Console()
 
 from synapse.graph.cpg import CodePropertyGraph
 from synapse.graph.model import (
@@ -31,7 +34,7 @@ class GraphBuilder:
         self.parser = ASTParser()
         self.resolver = ScopeResolver()
 
-    def build(self) -> CodePropertyGraph:
+    def build(self, progress_callback=None) -> CodePropertyGraph:
         """Full build pipeline:
         1. Scan files
         2. Create and clear store
@@ -45,16 +48,40 @@ class GraphBuilder:
         cpg = CodePropertyGraph(store)
 
         files = self.scanner.scan()
+        file_list = list(files)
         file_node_map: dict[str, int] = {}  # rel_path -> node_id
         chunk_node_map: dict[str, list[int]] = {}  # symbol_name -> [node_ids]
         all_chunks: list[CodeChunk] = []
         file_contents: dict[str, str] = {}
 
+        total_files = len(file_list)
+
         # 1. Create File nodes & parse chunks
-        with progress.Progress() as p:
-            task = p.add_task("[cyan]Scanning and parsing codebase...", total=len(files))
-            for f in files:
+        with progress.Progress(
+            progress.SpinnerColumn(),
+            progress.TextColumn("[bold blue]{task.description}"),
+            progress.BarColumn(bar_width=30),
+            progress.TaskProgressColumn(),
+            progress.TimeElapsedColumn(),
+            progress.TimeRemainingColumn(),
+            progress.TextColumn("·"),
+            progress.TextColumn("[cyan]{task.fields[speed]}[/cyan]"),
+            console=console,
+        ) as p:
+            task = p.add_task("Parsing files", total=total_files, speed="")
+            for i, f in enumerate(file_list):
                 rel_path = f.relative_path
+
+                # Update speed display
+                elapsed = p.tasks[task].elapsed or 0
+                if elapsed > 0 and i > 0:
+                    rate = i / elapsed
+                    remaining = (total_files - i) / rate if rate > 0 else 0
+                    speed = f"{rate:.1f} files/s"
+                else:
+                    speed = ""
+                p.update(task, speed=speed, description=f"Parsing [bold]{rel_path}[/bold]")
+
                 file_node = GraphNode(
                     id=0,
                     kind=NodeKind.FILE,
@@ -112,40 +139,69 @@ class GraphBuilder:
                 p.advance(task)
 
         # 2. Build class containment edges (Class -> Method)
-        for chunk in all_chunks:
-            if chunk.kind == SymbolKind.METHOD and chunk.enclosing_scope:
-                class_ids = chunk_node_map.get(chunk.enclosing_scope, [])
-                method_ids = chunk_node_map.get(chunk.name, [])
-                for cid in class_ids:
-                    for mid in method_ids:
-                        store.add_edge(GraphEdge(source_id=cid, target_id=mid, kind=EdgeKind.CONTAINS))
+        with progress.Progress(
+            progress.SpinnerColumn(),
+            progress.TextColumn("[bold blue]{task.description}"),
+            progress.BarColumn(bar_width=30),
+            progress.TaskProgressColumn(),
+            progress.TimeElapsedColumn(),
+            console=console,
+        ) as p:
+            task = p.add_task("Building containment edges", total=len(all_chunks))
+            for chunk in all_chunks:
+                if chunk.kind == SymbolKind.METHOD and chunk.enclosing_scope:
+                    class_ids = chunk_node_map.get(chunk.enclosing_scope, [])
+                    method_ids = chunk_node_map.get(chunk.name, [])
+                    for cid in class_ids:
+                        for mid in method_ids:
+                            store.add_edge(GraphEdge(source_id=cid, target_id=mid, kind=EdgeKind.CONTAINS))
+                p.advance(task)
 
         # 3. Resolve imports -> IMPORTS edges between file nodes
-        for rel_path, content in file_contents.items():
-            file_id = file_node_map.get(rel_path)
-            if not file_id:
-                continue
-            lang = "python" if rel_path.endswith(".py") else "javascript"
-            imports = self.resolver.resolve_imports(rel_path, content, lang)
-            for imp in imports:
-                # Find matching target file
-                for other_rel, other_id in file_node_map.items():
-                    if other_id == file_id:
-                        continue
-                    # Match module name or relative path
-                    mod_norm = imp.imported_module.replace(".", "/").replace("\\", "/")
-                    if mod_norm and (other_rel.startswith(mod_norm) or other_rel.endswith(f"{mod_norm}.py") or mod_norm in other_rel):
-                        store.add_edge(GraphEdge(source_id=file_id, target_id=other_id, kind=EdgeKind.IMPORTS))
+        with progress.Progress(
+            progress.SpinnerColumn(),
+            progress.TextColumn("[bold blue]{task.description}"),
+            progress.BarColumn(bar_width=30),
+            progress.TaskProgressColumn(),
+            progress.TimeElapsedColumn(),
+            console=console,
+        ) as p:
+            task = p.add_task("Resolving imports", total=len(file_contents))
+            for rel_path, content in file_contents.items():
+                file_id = file_node_map.get(rel_path)
+                if not file_id:
+                    p.advance(task)
+                    continue
+                lang = "python" if rel_path.endswith(".py") else "javascript"
+                imports = self.resolver.resolve_imports(rel_path, content, lang)
+                for imp in imports:
+                    for other_rel, other_id in file_node_map.items():
+                        if other_id == file_id:
+                            continue
+                        mod_norm = imp.imported_module.replace(".", "/").replace("\\", "/")
+                        if mod_norm and (other_rel.startswith(mod_norm) or other_rel.endswith(f"{mod_norm}.py") or mod_norm in other_rel):
+                            store.add_edge(GraphEdge(source_id=file_id, target_id=other_id, kind=EdgeKind.IMPORTS))
+                p.advance(task)
 
         # 4. Resolve references -> CALLS / REFERENCES edges
-        references = self.resolver.resolve_references(all_chunks, all_chunks)
-        for caller_name, callee_name in references:
-            caller_ids = chunk_node_map.get(caller_name, [])
-            callee_ids = chunk_node_map.get(callee_name, [])
-            for s_id in caller_ids:
-                for t_id in callee_ids:
-                    if s_id != t_id:
-                        store.add_edge(GraphEdge(source_id=s_id, target_id=t_id, kind=EdgeKind.CALLS))
+        with progress.Progress(
+            progress.SpinnerColumn(),
+            progress.TextColumn("[bold blue]{task.description}"),
+            progress.BarColumn(bar_width=30),
+            progress.TaskProgressColumn(),
+            progress.TimeElapsedColumn(),
+            console=console,
+        ) as p:
+            task = p.add_task("Resolving references", total=1)
+            references = self.resolver.resolve_references(all_chunks, all_chunks)
+            for caller_name, callee_name in references:
+                caller_ids = chunk_node_map.get(caller_name, [])
+                callee_ids = chunk_node_map.get(callee_name, [])
+                for s_id in caller_ids:
+                    for t_id in callee_ids:
+                        if s_id != t_id:
+                            store.add_edge(GraphEdge(source_id=s_id, target_id=t_id, kind=EdgeKind.CALLS))
+            p.advance(task)
 
         return cpg
 
