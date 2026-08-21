@@ -1,5 +1,8 @@
 """MCPServer exposing Synapse code intelligence tools for AI Agents."""
 
+import logging
+import sys
+from datetime import datetime
 from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
@@ -14,6 +17,27 @@ from synapse.retriever.graph_expander import GraphExpander
 from synapse.retriever.hybrid_search import HybridSearch
 from synapse.retriever.prompt_compressor import PromptCompressor
 from synapse.retriever.zoom_controller import ZoomController
+
+# Logging setup — writes to .synapse/mcp.log
+_log_file = Path(".synapse") / "mcp.log"
+_log_file.parent.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger("synapse-mcp")
+logger.setLevel(logging.INFO)
+_handler = logging.FileHandler(_log_file, encoding="utf-8")
+_handler.setFormatter(logging.Formatter("%(asctime)s | %(message)s", datefmt="%H:%M:%S"))
+logger.addHandler(_handler)
+# Also log to stderr so it appears in OpenCode terminal
+_stderr_handler = logging.StreamHandler(sys.stderr)
+_stderr_handler.setFormatter(logging.Formatter("[synapse] %(message)s"))
+logger.addHandler(_stderr_handler)
+
+
+def _log_call(tool: str, args: dict):
+    """Log every MCP tool call."""
+    arg_summary = ", ".join(f"{k}={v!r:.60}" for k, v in args.items())
+    logger.info(f"TOOL: {tool}({arg_summary})")
+
 
 mcp = MCPServer("synapse-code-intelligence")
 
@@ -49,6 +73,7 @@ def synapse_search(query: str, repo_path: str = ".", top_k: int = 5) -> str:
     """Search the codebase using hybrid BM25 + dense semantic retrieval with graph-aware reranking.
     Returns high-signal concise code snippets (~10 lines).
     """
+    _log_call("synapse_search", {"query": query, "top_k": top_k})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     results = searcher.search(query, top_k=top_k)
     if not results:
@@ -70,6 +95,7 @@ def synapse_map(repo_path: str = ".") -> str:
     """Get the high-level architectural map of the codebase (L0 zoom, ~100-300 tokens).
     Shows packages, modules, dependencies and exported symbols.
     """
+    _log_call("synapse_map", {"repo_path": repo_path})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     ctx = zoom.get_architecture_map()
     return f"```\n{ctx.content}\n```\n(Tokens: ~{ctx.token_count})"
@@ -80,6 +106,7 @@ def synapse_outline(file_path: str, repo_path: str = ".") -> str:
     """Get the skeleton outline of a file (L1 zoom, ~300-800 tokens).
     Shows class definitions, method signatures and docstrings with elided bodies.
     """
+    _log_call("synapse_outline", {"file_path": file_path})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     ctx = zoom.get_module_skeleton(file_path)
     return f"```python\n{ctx.content}\n```\n(Tokens: ~{ctx.token_count})"
@@ -90,6 +117,7 @@ def synapse_inspect(symbol: str, level: int = 2, repo_path: str = ".") -> str:
     """Inspect a specific symbol (class, function, method) at progressive detail levels:
     level 2 for interface contract and callees (~500 tokens), level 3 for full implementation body (~1500 tokens).
     """
+    _log_call("synapse_inspect", {"symbol": symbol, "level": level})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     if level == 2:
         ctx = zoom.get_interface_contracts(symbol)
@@ -101,6 +129,7 @@ def synapse_inspect(symbol: str, level: int = 2, repo_path: str = ".") -> str:
 @mcp.tool()
 def synapse_callers(symbol: str, repo_path: str = ".") -> str:
     """Find all callers that invoke a specific function or method across the entire codebase."""
+    _log_call("synapse_callers", {"symbol": symbol})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     callers = cpg.get_callers(symbol)
     if not callers:
@@ -114,6 +143,7 @@ def synapse_callers(symbol: str, repo_path: str = ".") -> str:
 @mcp.tool()
 def synapse_callees(symbol: str, repo_path: str = ".") -> str:
     """Find all functions and methods called by a specific symbol."""
+    _log_call("synapse_callees", {"symbol": symbol})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     callees = cpg.get_callees(symbol)
     if not callees:
@@ -129,6 +159,7 @@ def synapse_fingerprint(symbol: str, repo_path: str = ".") -> str:
     """Get an ultra-compact contextual fingerprint (~20 tokens) of a symbol showing its role,
     popularity, in/out degrees and centrality rank.
     """
+    _log_call("synapse_fingerprint", {"symbol": symbol})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     for kind in [NodeKind.FUNCTION, NodeKind.CLASS, NodeKind.METHOD]:
         for n in cpg.store.get_nodes_by_kind(kind):
@@ -143,6 +174,7 @@ def synapse_expand(symbol: str, token_budget: int = 2048, repo_path: str = ".") 
     """Expand context around a symbol using Personalized PageRank (PPR) to extract the most
     structurally relevant subgraph fitting the token budget.
     """
+    _log_call("synapse_expand", {"symbol": symbol, "budget": token_budget})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     expander = GraphExpander(cpg)
     target_node = None
@@ -169,6 +201,7 @@ def synapse_prompt(symbol: str, token_budget: int = 2048, repo_path: str = ".") 
     """Generate a high-density, graph-compressed markdown context block for an LLM agent turn.
     Contains focus code body + 1-hop interface signatures + data schemas.
     """
+    _log_call("synapse_prompt", {"symbol": symbol, "budget": token_budget})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     compressor = PromptCompressor(cpg)
     result = compressor.compress(focus_symbol_name=symbol, token_budget=token_budget)
@@ -180,6 +213,7 @@ def synapse_diff_context(changed_files: list[str], repo_path: str = ".") -> str:
     """Compute an incremental context delta from a list of changed/staged files,
     showing modified symbol signatures and impacted cross-file callers.
     """
+    _log_call("synapse_diff_context", {"files": changed_files})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     engine = DiffAwareContextEngine(cpg)
     delta = engine.compute_delta_from_files(changed_files)
@@ -189,6 +223,7 @@ def synapse_diff_context(changed_files: list[str], repo_path: str = ".") -> str:
 @mcp.tool()
 def synapse_clusters(repo_path: str = ".") -> str:
     """View functional domain clusters and architectural topology of the repository."""
+    _log_call("synapse_clusters", {})
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     fingerprinter = CodebaseFingerprinter(cpg)
     clusters = fingerprinter.get_topology_clusters()
@@ -208,6 +243,7 @@ def synapse_slice(target: str, direction: str = "backward", repo_path: str = "."
     a specific variable or statement. Target format: file_path:line_number[:variable].
     Uses backward slicing by default (what feeds into this point), or forward (what this affects).
     """
+    _log_call("synapse_slice", {"target": target, "direction": direction})
     from synapse.retriever.program_slicer import ProgramSlicer
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     slicer = ProgramSlicer(cpg)
@@ -245,6 +281,7 @@ def synapse_impact(changed_files: list[str], repo_path: str = ".") -> str:
     """Analyze the impact of changes across the codebase. Given a list of changed files,
     finds all downstream functions and files that might be affected (transitive caller analysis).
     """
+    _log_call("synapse_impact", {"files": changed_files})
     from synapse.retriever.program_slicer import ProgramSlicer
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     slicer = ProgramSlicer(cpg)
@@ -257,6 +294,7 @@ def synapse_adaptive(query: str, symbol: str = None, token_budget: int = None, r
     """Task-adaptive retrieval: auto-detects task type (explore/understand/edit/debug/refactor/review)
     from the query and retrieves an optimized multi-level context block.
     """
+    _log_call("synapse_adaptive", {"query": query, "symbol": symbol})
     from synapse.retriever.task_adaptive import TaskAdaptiveRetriever
     cpg, searcher, zoom = get_or_load_cpg(repo_path)
     retriever = TaskAdaptiveRetriever(cpg, searcher)
