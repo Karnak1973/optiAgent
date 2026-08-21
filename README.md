@@ -85,7 +85,7 @@ synapse inspect AuthService.login . --level 3
 
 | Command | Description |
 |:---|:---|
-| `synapse index <path>` | Index a repository and build the Code Property Graph |
+| `synapse index <path>` | Index a repository — shows file type breakdown, node/edge distribution, and visual bars |
 
 ### Search & Retrieval
 
@@ -124,8 +124,9 @@ synapse inspect AuthService.login . --level 3
 
 | Command | Description |
 |:---|:---|
-| `synapse stats` | Show statistics about the indexed repository |
-| `synapse viz` | Launch 3D graph visualization in your browser |
+| `synapse stats` | Dashboard with overview, node types, edge types, and visual bars |
+| `synapse info` | Project info, token efficiency, top 5 largest symbols |
+| `synapse viz` | Launch 3D graph visualization with flow simulation |
 
 ## Program Slicing
 
@@ -181,21 +182,42 @@ synapse viz .
 Opens `http://127.0.0.1:8765` with:
 
 - **3D graph** — nodes as spheres (files, classes, functions, methods) with force-directed layout
-- **Color-coded** by node type (blue=File, red=Class, green=Function, cyan=Method)
+- **Color-coded** by node type (blue=File, red=Class, yellow=Interface, green=Function, cyan=Method)
 - **Node size** reflects token consumption
 - **Hover** any node to see name, kind, tokens, and file
-- **Click** a node to see its signature and details
-- **Sidebar tabs**:
-  - **Overview** — graph stats, legend, selected node detail
-  - **Tokens** — bar chart comparing L0/L1/L2/L3 token consumption + per-symbol breakdown
-  - **Symbols** — full list of all symbols, click to zoom into any symbol
+- **Click** a node to trace its call chain with animated flow
 
-**Controls:**
-- **Orbit** — click and drag to rotate
-- **Zoom** — scroll wheel
-- **Force Layout** — reset to force-directed arrangement
-- **Radial Layout** — arrange nodes by kind in concentric rings
-- **Toggle Labels** — show/hide node labels
+### Flow Simulation
+
+When you click a node, Synapse traces the full call chain (up to 4 hops) and displays it in the **Flow** tab:
+
+- **Animated particles** travel along CALLS edges showing data flow direction
+- **Click-to-trace** — clicking a node highlights connected nodes with directional arrows
+- **Play** — step through the execution flow automatically (1.2s per step)
+- **Step** — advance one step at a time manually
+- **Reset** — reset the simulation and camera
+- **Live token counter** — shows tokens consumed as the simulation progresses
+- **Camera follows** — view follows the active node during simulation
+
+### Sidebar Tabs
+
+| Tab | Content |
+|:---|:---|
+| **Graph** | Stats, legend, selected node details |
+| **Flow** | Call chain steps, Play/Step/Reset controls, token consumption |
+| **Tokens** | Bar chart comparing L0/L1/L2/L3 token consumption + per-symbol breakdown |
+| **Symbols** | Full list of all symbols, click to zoom into any |
+
+### Controls
+
+| Control | Action |
+|:---|:---|
+| **Orbit** | Click and drag to rotate |
+| **Zoom** | Scroll wheel |
+| **Force** | Force-directed layout |
+| **Radial** | Arrange nodes by kind in concentric rings |
+| **Labels** | Toggle node name labels |
+| **Particles** | Toggle animated flow particles |
 
 ```bash
 synapse viz . --port 9000        # custom port
@@ -441,3 +463,7 @@ ruff format synapse/
 ## License
 
 MIT
+
+---
+
+**by [karnak1973](https://github.com/Karnak1973)**
