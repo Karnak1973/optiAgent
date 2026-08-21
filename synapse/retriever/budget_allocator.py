@@ -67,6 +67,7 @@ class TokenBudgetAllocator:
 
         Given nodes sorted by relevance score, use binary search on the score threshold
         to find the optimal cutoff that maximizes information within the token budget.
+        Falls back to greedy selection when scores are uniform.
         """
         if not ranked_nodes:
             return []
@@ -78,6 +79,19 @@ class TokenBudgetAllocator:
             if node.metadata.get("token_count_skeleton"):
                 return node.metadata["token_count_skeleton"]
             return max(1, len(node.skeleton or node.full_body or node.name) // 4)
+
+        # Check if scores are all the same (binary search won't help)
+        unique_scores = set(score for _, score in ranked_nodes)
+        if len(unique_scores) <= 1:
+            # Greedy selection: just pack nodes in score order
+            selected: list[GraphNode] = []
+            tokens = 0
+            for node, _ in ranked_nodes:
+                node_tokens = estimate_tokens(node)
+                if tokens + node_tokens <= total_budget:
+                    selected.append(node)
+                    tokens += node_tokens
+            return selected
 
         def total_tokens_for_threshold(threshold: float) -> tuple[int, list[GraphNode]]:
             selected: list[GraphNode] = []
@@ -93,10 +107,10 @@ class TokenBudgetAllocator:
 
         # Binary search on score threshold
         low = 0.0
-        high = ranked_nodes[0][1] + 1e-9 if ranked_nodes else 1.0
+        high = ranked_nodes[0][1] + 1e-9
         best_nodes: list[GraphNode] = []
 
-        for _ in range(30):  # 30 iterations = precision ~1e-9
+        for _ in range(30):
             mid = (low + high) / 2
             tokens, nodes = total_tokens_for_threshold(mid)
             if tokens <= total_budget:

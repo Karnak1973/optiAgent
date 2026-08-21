@@ -118,8 +118,10 @@ class TestBudgetAllocatorBinarySearch:
         nodes = []
         for kind in [NodeKind.FUNCTION, NodeKind.METHOD]:
             for n in cpg.store.get_nodes_by_kind(kind):
+                tokens = n.metadata.get("token_count_skeleton", max(1, len(n.skeleton or n.name) // 4))
                 nodes.append((n, 0.5))
-        result = allocator.fit_nodes_to_budget(nodes, 10000)
+        total_tokens = sum(n.metadata.get("token_count_skeleton", max(1, len(n.skeleton or n.name) // 4)) for n, _ in nodes)
+        result = allocator.fit_nodes_to_budget(nodes, total_tokens + 100)
         assert len(result) > 0
 
     def test_fit_nodes_respects_budget(self, cpg):
