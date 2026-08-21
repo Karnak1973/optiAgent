@@ -171,13 +171,9 @@ synapse adaptive "refactor the auth module"
 
 ## MCP Server (for AI Agents)
 
-Synapse exposes an MCP server with 14 tools for AI agents like GitHub Copilot, Claude Code, Cursor, or Aider.
+Synapse exposes an MCP server with 14 tools for AI agents like GitHub Copilot, OpenCode, Claude Code, Cursor, or Aider.
 
-### GitHub Copilot (VS Code)
-
-Synapse works natively with **GitHub Copilot Agent Mode** via MCP.
-
-**Step 1: Install Synapse**
+### Install & Index (required for all clients)
 
 ```bash
 git clone https://github.com/Karnak1973/optiAgent.git
@@ -188,17 +184,12 @@ python -m venv .venv
 # macOS/Linux
 source .venv/bin/activate
 pip install -e ".[dev,mcp]"
-```
-
-**Step 2: Index your project**
-
-```bash
 synapse index .
 ```
 
-**Step 3: Configure MCP in VS Code**
+### GitHub Copilot (VS Code)
 
-The `.vscode/mcp.json` is already included in the repo. It looks like this:
+The `.vscode/mcp.json` is already included in the repo. VS Code auto-discovers it.
 
 ```json
 {
@@ -216,36 +207,55 @@ The `.vscode/mcp.json` is already included in the repo. It looks like this:
 > - **Windows:** `${workspaceFolder}/.venv/Scripts/python.exe`
 > - **macOS/Linux:** `${workspaceFolder}/.venv/bin/python`
 
-**Step 4: Use in Copilot Chat (Agent Mode)**
-
 1. Open VS Code with your project
-2. Toggle **Agent Mode** in the Copilot Chat panel (click the icon next to the chat input)
-3. Copilot will auto-discover the Synapse MCP server
-4. Ask questions — Copilot will automatically use Synapse tools:
+2. Toggle **Agent Mode** in the Copilot Chat panel
+3. Ask questions — Copilot uses Synapse tools automatically:
 
 ```
 @copilot Show me the architecture of this project
 @copilot How does the login flow work?
-@copilot What functions call AuthService.login?
 @copilot What would break if I change auth/service.py?
 ```
 
-**Available tools in Copilot:**
+### OpenCode (Terminal / Desktop / IDE)
 
-| Tool | What Copilot uses it for |
-|:---|:---|
-| `synapse_search` | Finding relevant code snippets |
-| `synapse_map` | Understanding project architecture |
-| `synapse_outline` | Reading file structures |
-| `synapse_inspect` | Reading function implementations |
-| `synapse_callers` / `synapse_callees` | Tracing call chains |
-| `synapse_slice` | Debugging specific variables |
-| `synapse_impact` | Analyzing change impact |
-| `synapse_adaptive` | Auto-adjusting context depth |
+The `opencode.json` is already included in the repo. OpenCode auto-discovers it.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "synapse": {
+      "type": "local",
+      "command": [".venv/Scripts/python.exe", "-m", "synapse.server"],
+      "cwd": ".",
+      "enabled": true
+    }
+  }
+}
+```
+
+> **Note:** Adjust the `command` path for your OS:
+> - **Windows:** `.venv/Scripts/python.exe`
+> - **macOS/Linux:** `.venv/bin/python`
+
+1. Navigate to your project and run `opencode`
+2. Synapse tools are available immediately — just ask:
+
+```
+Show me the architecture of this project, use synapse
+How does login work? use synapse
+What functions call AuthService.login? use synapse
+What would break if I change auth/service.py? use synapse
+```
+
+You can also add a rule to `AGENTS.md` so OpenCode uses Synapse by default:
+
+```markdown
+When you need to search, understand, or analyze code, use `synapse` tools.
+```
 
 ### Claude Desktop / Cursor / Other MCP Clients
-
-Add to your MCP client configuration:
 
 ```json
 {
